@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HKDSE M2 Definite Integration & Bounded Area Visualizer</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Math.js for parsing and evaluating mathematical functions -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.8.0/math.js"></script>
+    <style>
+        /* Custom scrollbar for a polished look */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans h-screen flex flex-col overflow-hidden">
+
+    <!-- Header -->
+    <header class="bg-white shadow-sm border-b border-slate-200 px-6 py-4 flex justify-between items-center z-10 shrink-0">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-800">Definite Integration & Bounded Area</h1>
+            <p class="text-sm text-slate-500">HKDSE Mathematics Module 2 (Algebra and Calculus) Concept Visualizer</p>
+        </div>
+        <div id="header-formula" class="hidden md:block bg-blue-50 text-blue-700 px-4 py-2 rounded-lg text-sm font-medium border border-blue-100">
+            $$\int_a^b f(x) dx = \lim_{n \to \infty} \sum_{i=1}^{n} f(x_i) \Delta x$$
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col md:flex-row overflow-hidden">
+        
+        <!-- Left Controls Panel -->
+        <aside class="w-full md:w-80 lg:w-96 bg-white border-r border-slate-200 flex flex-col overflow-y-auto shrink-0 z-10 shadow-[4px_0_24px_rgba(0,0,0,0.02)]">
+            <div class="p-6 space-y-6">
+                
+                <!-- Axis Selection -->
+                <div class="space-y-3">
+                    <label class="block text-sm font-semibold text-slate-700">1. Axis of Integration</label>
+                    <div class="flex space-x-6">
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="radio" name="axis" value="x" checked class="w-4 h-4 text-blue-600 focus:ring-blue-500 border-slate-300">
+                            <span class="text-sm text-slate-700">x-axis (dx)</span>
+                        </label>
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="radio" name="axis" value="y" class="w-4 h-4 text-blue-600 focus:ring-blue-500 border-slate-300">
+                            <span class="text-sm text-slate-700">y-axis (dy)</span>
+                        </label>
+                    </div>
+                </div>
+
+                <hr class="border-slate-100">
+
+                <!-- Function Input -->
+                <div class="space-y-3">
+                    <label id="func-label" class="block text-sm font-semibold text-slate-700">2. Define Function <span class="text-xs font-normal text-slate-400 ml-1">y = f(x)</span></label>
+                    
+                    <select id="preset-select" class="w-full bg-slate-50 border border-slate-300 text-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <option value="custom">-- Custom Function --</option>
+                        <optgroup label="Functions of x (dx)">
+                            <option value="-x^2 + 4" data-a="-2" data-b="2" data-axis="x">Polynomial: y = -x² + 4</option>
+                            <option value="x^3 - 4x" data-a="-2" data-b="2" data-axis="x">Crosses x-axis: y = x³ - 4x</option>
+                            <option value="sin(x)" data-a="0" data-b="pi" data-axis="x">Trigonometric: y = sin(x)</option>
+                            <option value="e^x" data-a="-1" data-b="2" data-axis="x">Exponential: y = e^x</option>
+                            <option value="log(x)" data-a="1" data-b="3" data-axis="x">Logarithmic: y = ln(x)</option>
+                            <option value="1/x" data-a="1" data-b="4" data-axis="x">Rational: y = 1/x</option>
+                        </optgroup>
+                        <optgroup label="Functions of y (dy)">
+                            <option value="y^2 - 4" data-a="-2" data-b="2" data-axis="y">Polynomial: x = y² - 4</option>
+                            <option value="y^3 - 4y" data-a="-2" data-b="2" data-axis="y">Crosses y-axis: x = y³ - 4y</option>
+                            <option value="sin(y)" data-a="0" data-b="pi" data-axis="y">Trigonometric: x = sin(y)</option>
+                        </optgroup>
+                    </select>
+
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                            <span id="func-prefix" class="text-slate-500 font-serif italic">f(x) =</span>
+                        </div>
+                        <input type="text" id="func-input" value="-x^2 + 4" class="w-full bg-white border border-slate-300 text-slate-900 rounded-lg pl-12 pr-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm" placeholder="e.g. sin(x) + 2">
+                    </div>
+                    <div id="parse-error" class="text-red-500 text-xs hidden">Invalid function syntax. Use standard math notation (e.g. x^2, sin(x), e^x).</div>
+                </div>
+
+                <hr class="border-slate-100">
+
+                <!-- Bounds Input -->
+                <div class="space-y-3">
+                    <label class="block text-sm font-semibold text-slate-700">3. Integration Bounds</label>
+                    <div class="flex items-center space-x-4">
+                        <div class="flex-1">
+                            <label id="label-bound-a" class="block text-xs text-slate-500 mb-1">Lower Bound (x=a)</label>
+                            <input type="text" id="bound-a" value="-2" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono">
+                        </div>
+                        <div class="flex-1">
+                            <label id="label-bound-b" class="block text-xs text-slate-500 mb-1">Upper Bound (x=b)</label>
+                            <input type="text" id="bound-b" value="2" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono">
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-400">You can use 'pi' or 'e' as values.</p>
+                </div>
+
+                <hr class="border-slate-100">
+
+                <!-- Visualization Mode -->
+                <div class="space-y-3">
+                    <label class="block text-sm font-semibold text-slate-700">4. Visualization Mode</label>
+                    
+                    <div class="grid grid-cols-2 gap-2">
+                        <button id="mode-exact" class="mode-btn active bg-blue-600 text-white border-blue-600 border px-3 py-2 rounded-lg text-sm font-medium transition-colors">Exact Area</button>
+                        <button id="mode-riemann" class="mode-btn bg-white text-slate-700 border-slate-300 border hover:bg-slate-50 px-3 py-2 rounded-lg text-sm font-medium transition-colors">Riemann Sums</button>
+                    </div>
+
+                    <div id="riemann-controls" class="hidden bg-slate-50 p-4 rounded-lg border border-slate-200 mt-2 space-y-4">
+                        <div>
+                            <div class="flex justify-between text-xs text-slate-500 mb-1">
+                                <span>Subintervals (n)</span>
+                                <span id="n-val" class="font-bold text-slate-700">10</span>
+                            </div>
+                            <input type="range" id="n-slider" min="1" max="100" value="10" class="w-full accent-blue-600">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-500 mb-2">Evaluation Point</label>
+                            <div class="flex rounded-md shadow-sm" role="group">
+                                <button type="button" id="type-left" class="riemann-type flex-1 px-2 py-1.5 text-xs font-medium bg-white border border-slate-300 rounded-l-lg hover:bg-slate-100 focus:z-10 focus:ring-2 focus:ring-blue-500 text-slate-900 bg-slate-200 shadow-inner">Left</button>
+                                <button type="button" id="type-mid" class="riemann-type flex-1 px-2 py-1.5 text-xs font-medium bg-white border-t border-b border-slate-300 hover:bg-slate-100 focus:z-10 focus:ring-2 focus:ring-blue-500 text-slate-500">Mid</button>
+                                <button type="button" id="type-right" class="riemann-type flex-1 px-2 py-1.5 text-xs font-medium bg-white border border-slate-300 rounded-r-lg hover:bg-slate-100 focus:z-10 focus:ring-2 focus:ring-blue-500 text-slate-500">Right</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+            
+            <!-- Calculations Display -->
+            <div class="mt-auto bg-slate-800 text-white p-6 rounded-t-2xl shadow-lg">
+                <h3 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">Calculations</h3>
+                
+                <div class="space-y-3">
+                    <div class="flex justify-between items-center">
+                        <span id="calc-integral-label" class="text-sm font-medium">Definite Integral $\int_a^b f(x) dx$</span>
+                        <span id="res-integral" class="font-mono font-bold text-blue-300">0.000</span>
+                    </div>
+                    <div class="w-full bg-slate-700 h-px"></div>
+                    <div class="flex justify-between items-center">
+                        <div class="flex flex-col">
+                            <span id="calc-area-label" class="text-sm font-medium">Bounded Area $\int_a^b |f(x)| dx$</span>
+                            <span class="text-[10px] text-slate-400 mt-0.5">(Absolute area under curve)</span>
+                        </div>
+                        <span id="res-area" class="font-mono font-bold text-green-400">0.000</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Canvas Area -->
+        <section class="flex-1 relative bg-white">
+            <canvas id="graphCanvas"></canvas>
+            
+            <!-- Legend overlay -->
+            <div class="absolute top-4 right-4 bg-white/90 backdrop-blur border border-slate-200 shadow-sm rounded-lg p-3 text-xs space-y-2 pointer-events-none">
+                <div class="flex items-center space-x-2">
+                    <div class="w-3 h-3 bg-blue-500/30 border border-blue-500 rounded-sm"></div>
+                    <span id="legend-pos" class="text-slate-600">Positive Area / $f(x) > 0$</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <div class="w-3 h-3 bg-red-500/30 border border-red-500 rounded-sm"></div>
+                    <span id="legend-neg" class="text-slate-600">Negative Area / $f(x) < 0$</span>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        // DOM Elements
+        const canvas = document.getElementById('graphCanvas');
+        const ctx = canvas.getContext('2d');
+        const funcInput = document.getElementById('func-input');
+        const presetSelect = document.getElementById('preset-select');
+        const boundA = document.getElementById('bound-a');
+        const boundB = document.getElementById('bound-b');
+        const errorMsg = document.getElementById('parse-error');
+        
+        // Mode Buttons
+        const btnExact = document.getElementById('mode-exact');
+        const btnRiemann = document.getElementById('mode-riemann');
+        const riemannControls = document.getElementById('riemann-controls');
+        const nSlider = document.getElementById('n-slider');
+        const nVal = document.getElementById('n-val');
+        
+        const typeLeft = document.getElementById('type-left');
+        const typeMid = document.getElementById('type-mid');
+        const typeRight = document.getElementById('type-right');
+
+        // Results
+        const resIntegral = document.getElementById('res-integral');
+        const resArea = document.getElementById('res-area');
+
+        // State variables
+        let compiledFunc = null;
+        let mode = 'exact'; // 'exact' or 'riemann'
+        let riemannType = 'left'; // 'left', 'mid', 'right'
+        let axis = 'x'; // 'x' or 'y'
+        
+        // Viewport settings for Canvas
+        let scaleX = 1;
+        let scaleY = 1;
+        let offsetX = 0;
+        let offsetY = 0;
+        let mathMinX, mathMaxX, mathMinY, mathMaxY;
+
+        // --- Initialization ---
+        function init() {
+            window.addEventListener('resize', handleResize);
+            
+            // Event Listeners for inputs
+            document.getElementsByName('axis').forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    handleAxisChange(e.target.value);
+                });
+            });
+
+            funcInput.addEventListener('input', () => { presetSelect.value = 'custom'; updateApp(); });
+            presetSelect.addEventListener('change', handlePresetChange);
+            boundA.addEventListener('input', updateApp);
+            boundB.addEventListener('input', updateApp);
+            
+            // Visualization Modes
+            btnExact.addEventListener('click', () => setMode('exact'));
+            btnRiemann.addEventListener('click', () => setMode('riemann'));
+            
+            // Riemann controls
+            nSlider.addEventListener('input', (e) => { nVal.innerText = e.target.value; updateApp(); });
+            typeLeft.addEventListener('click', () => setRiemannType('left'));
+            typeMid.addEventListener('click', () => setRiemannType('mid'));
+            typeRight.addEventListener('click', () => setRiemannType('right'));
+
+            handleResize();
+            updateApp();
+        }
+
+        function setMode(newMode) {
+            mode = newMode;
+            if (mode === 'exact') {
+                btnExact.className = "mode-btn active bg-blue-600 text-white border-blue-600 border px-3 py-2 rounded-lg text-sm font-medium transition-colors";
+                btnRiemann.className = "mode-btn bg-white text-slate-700 border-slate-300 border hover:bg-slate-50 px-3 py-2 rounded-lg text-sm font-medium transition-colors";
+                riemannControls.classList.add('hidden');
+            } else {
+                btnRiemann.className = "mode-btn active bg-blue-600 text-white border-blue-600 border px-3 py-2 rounded-lg text-sm font-medium transition-colors";
+                btnExact.className = "mode-btn bg-white text-slate-700 border-slate-300 border hover:bg-slate-50 px-3 py-2 rounded-lg text-sm font-medium transition-colors";
+                riemannControls.classList.remove('hidden');
+            }
+            updateApp();
+        }
+
+        function setRiemannType(type) {
+            riemannType = type;
+            const activeClass = "riemann-type flex-1 px-2 py-1.5 text-xs font-medium bg-slate-200 border border-slate-300 text-slate-900 shadow-inner";
+            const inactiveClass = "riemann-type flex-1 px-2 py-1.5 text-xs font-medium bg-white border border-slate-300 hover:bg-slate-100 text-slate-500";
+            
+            typeLeft.className = type === 'left' ? activeClass + " rounded-l-lg" : inactiveClass + " rounded-l-lg";
+            typeMid.className = type === 'mid' ? activeClass + " border-l-0 border-r-0" : inactiveClass + " border-l-0 border-r-0";
+            typeRight.className = type === 'right' ? activeClass + " rounded-r-lg" : inactiveClass + " rounded-r-lg";
+            
+            updateApp();
+        }
+
+        function handleAxisChange(newAxis) {
+            if (axis === newAxis) return;
+            axis = newAxis;
+            
+            // Swap variables in input smartly if they haven't explicitly chosen a preset
+            if (presetSelect.value === 'custom') {
+                let currentFunc = funcInput.value;
+                if (axis === 'y') {
+                    funcInput.value = currentFunc.replace(/x/g, 'TMP').replace(/y/g, 'x').replace(/TMP/g, 'y');
+                } else {
+                    funcInput.value = currentFunc.replace(/y/g, 'TMP').replace(/x/g, 'y').replace(/TMP/g, 'x');
+                }
+            }
+
+            updateLabelsForAxis();
+            updateApp();
+        }
+
+        function updateLabelsForAxis() {
+            const headerFormula = document.getElementById('header-formula');
+            const funcLabel = document.getElementById('func-label');
+            const funcPrefix = document.getElementById('func-prefix');
+            const labelA = document.getElementById('label-bound-a');
+            const labelB = document.getElementById('label-bound-b');
+            const calcIntegral = document.getElementById('calc-integral-label');
+            const calcArea = document.getElementById('calc-area-label');
+            const legendPos = document.getElementById('legend-pos');
+            const legendNeg = document.getElementById('legend-neg');
+
+            if (axis === 'x') {
+                headerFormula.innerHTML = '$$\\int_a^b f(x) dx = \\lim_{n \\to \\infty} \\sum_{i=1}^{n} f(x_i) \\Delta x$$';
+                funcLabel.innerHTML = '2. Define Function <span class="text-xs font-normal text-slate-400 ml-1">y = f(x)</span>';
+                funcPrefix.innerText = 'f(x) =';
+                labelA.innerText = 'Lower Bound (x=a)';
+                labelB.innerText = 'Upper Bound (x=b)';
+                calcIntegral.innerHTML = 'Definite Integral $\\int_a^b f(x) dx$';
+                calcArea.innerHTML = 'Bounded Area $\\int_a^b |f(x)| dx$';
+                legendPos.innerHTML = 'Positive Area / $f(x) > 0$';
+                legendNeg.innerHTML = 'Negative Area / $f(x) < 0$';
+            } else {
+                headerFormula.innerHTML = '$$\\int_c^d g(y) dy = \\lim_{n \\to \\infty} \\sum_{i=1}^{n} g(y_i) \\Delta y$$';
+                funcLabel.innerHTML = '2. Define Function <span class="text-xs font-normal text-slate-400 ml-1">x = g(y)</span>';
+                funcPrefix.innerText = 'g(y) =';
+                labelA.innerText = 'Lower Bound (y=c)';
+                labelB.innerText = 'Upper Bound (y=d)';
+                calcIntegral.innerHTML = 'Definite Integral $\\int_c^d g(y) dy$';
+                calcArea.innerHTML = 'Bounded Area $\\int_c^d |g(y)| dy$';
+                legendPos.innerHTML = 'Positive Area / $g(y) > 0$';
+                legendNeg.innerHTML = 'Negative Area / $g(y) < 0$';
+            }
+        }
+
+        function handlePresetChange(e) {
+            if (e.target.value !== 'custom') {
+                const option = e.target.options[e.target.selectedIndex];
+                const presetAxis = option.dataset.axis;
+                
+                // Switch axis UI if preset belongs to different axis
+                if (presetAxis && presetAxis !== axis) {
+                    document.querySelector(`input[name="axis"][value="${presetAxis}"]`).checked = true;
+                    axis = presetAxis;
+                    updateLabelsForAxis();
+                }
+
+                funcInput.value = e.target.value;
+                boundA.value = option.dataset.a;
+                boundB.value = option.dataset.b;
+                updateApp();
+            }
+        }
+
+        function handleResize() {
+            // Support high DPI displays
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.parentElement.getBoundingClientRect();
+            
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            
+            ctx.scale(dpr, dpr);
+            canvas.style.width = `${rect.width}px`;
+            canvas.style.height = `${rect.height}px`;
+            
+            updateApp();
+        }
+
+        // --- Core Logic ---
+        function parseValue(valStr) {
+            try {
+                // Allows user to input 'pi', '2*pi', 'e' etc.
+                return math.evaluate(valStr);
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function updateApp() {
+            const expression = funcInput.value;
+            let a = parseValue(boundA.value);
+            let b = parseValue(boundB.value);
+
+            if (a === null || b === null || isNaN(a) || isNaN(b)) return;
+
+            try {
+                // In mathjs, log is natural log (ln) which fits HKDSE M2
+                compiledFunc = math.compile(expression);
+                // test evaluation to catch syntax errors
+                compiledFunc.evaluate({x: 1, y: 1}); 
+                errorMsg.classList.add('hidden');
+                funcInput.classList.remove('border-red-500');
+            } catch (err) {
+                errorMsg.classList.remove('hidden');
+                funcInput.classList.add('border-red-500');
+                return;
+            }
+
+            drawGraph(a, b);
+            calculateMetrics(a, b);
+        }
+
+        function evaluateMath(val) {
+            try {
+                // By providing both x and y as the value, it cleanly handles
+                // expressions typed with either variable regardless of strict mode.
+                const res = compiledFunc.evaluate({x: val, y: val});
+                // Filter out non-real numbers (like log(-1))
+                return (typeof res === 'number' && !isNaN(res)) ? res : null;
+            } catch(e) {
+                return null;
+            }
+        }
+
+        // --- Rendering ---
+        function drawGraph(a, b) {
+            const width = canvas.width / (window.devicePixelRatio || 1);
+            const height = canvas.height / (window.devicePixelRatio || 1);
+            
+            ctx.clearRect(0, 0, width, height);
+
+            // 1. Calculate bounding box for math coordinates
+            const paddingVal = Math.max(0.5, Math.abs(b - a) * 0.2);
+            const minIndep = Math.min(a, b) - paddingVal;
+            const maxIndep = Math.max(a, b) + paddingVal;
+
+            let minDep = 0;
+            let maxDep = 0;
+            const numPoints = 200;
+            const dVal = (maxIndep - minIndep) / numPoints;
+            
+            let hasValidPoints = false;
+            for (let i = 0; i <= numPoints; i++) {
+                const val = minIndep + i * dVal;
+                const out = evaluateMath(val);
+                if (out !== null && isFinite(out)) {
+                    if (!hasValidPoints) {
+                        minDep = maxDep = out;
+                        hasValidPoints = true;
+                    } else {
+                        if (out < minDep) minDep = out;
+                        if (out > maxDep) maxDep = out;
+                    }
+                }
+            }
+
+            // Ensure dependent axis covers origin nicely
+            if (minDep > 0) minDep = -0.2 * maxDep;
+            if (maxDep < 0) maxDep = -0.2 * minDep;
+            
+            // Add vertical padding
+            const depRange = maxDep - minDep;
+            if (depRange === 0) { minDep = -1; maxDep = 1; }
+            minDep = minDep - depRange * 0.1;
+            maxDep = maxDep + depRange * 0.1;
+
+            if (axis === 'x') {
+                mathMinX = minIndep;
+                mathMaxX = maxIndep;
+                mathMinY = minDep;
+                mathMaxY = maxDep;
+            } else {
+                mathMinX = minDep;
+                mathMaxX = maxDep;
+                mathMinY = minIndep;
+                mathMaxY = maxIndep;
+            }
+
+            // Compute mapping scales
+            scaleX = width / (mathMaxX - mathMinX);
+            scaleY = height / (mathMaxY - mathMinY);
+            offsetX = -mathMinX * scaleX;
+            offsetY = mathMaxY * scaleY; // Flipped Y axis for screen
+
+            // 2. Draw Grid and Axes
+            drawGrid(width, height);
+            drawAxes(width, height);
+
+            // 3. Draw Area/Riemann Sums
+            if (mode === 'exact') {
+                drawExactArea(a, b);
+            } else {
+                drawRiemannSums(a, b);
+            }
+
+            // 4. Draw Function Line
+            drawFunctionCurve();
+        }
+
+        // Coordinate Mapping Helpers
+        const toScreenX = (mathX) => mathX * scaleX + offsetX;
+        const toScreenY = (mathY) => offsetY - mathY * scaleY;
+
+        function drawGrid(w, h) {
+            ctx.strokeStyle = '#f1f5f9';
+            ctx.lineWidth = 1;
+
+            // X-grid
+            const xStep = calculateTickSpacing(mathMaxX - mathMinX);
+            const startX = Math.floor(mathMinX / xStep) * xStep;
+            
+            for (let x = startX; x <= mathMaxX; x += xStep) {
+                const sx = toScreenX(x);
+                ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx, h); ctx.stroke();
+            }
+
+            // Y-grid
+            const yStep = calculateTickSpacing(mathMaxY - mathMinY);
+            const startY = Math.floor(mathMinY / yStep) * yStep;
+            
+            for (let y = startY; y <= mathMaxY; y += yStep) {
+                const sy = toScreenY(y);
+                ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(w, sy); ctx.stroke();
+            }
+        }
+
+        function calculateTickSpacing(range) {
+            const magnitude = Math.pow(10, Math.floor(Math.log10(range)));
+            const normalized = range / magnitude;
+            let step = magnitude;
+            if (normalized < 2) step = magnitude / 5;
+            else if (normalized < 5) step = magnitude / 2;
+            return step;
+        }
+
+        function drawAxes(w, h) {
+            ctx.strokeStyle = '#94a3b8';
+            ctx.lineWidth = 1.5;
+
+            const originX = toScreenX(0);
+            const originY = toScreenY(0);
+
+            // X axis
+            ctx.beginPath();
+            ctx.moveTo(0, originY);
+            ctx.lineTo(w, originY);
+            ctx.stroke();
+
+            // Y axis
+            ctx.beginPath();
+            ctx.moveTo(originX, 0);
+            ctx.lineTo(originX, h);
+            ctx.stroke();
+
+            // Ticks and Labels
+            ctx.fillStyle = '#64748b';
+            ctx.font = '10px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+
+            const xStep = calculateTickSpacing(mathMaxX - mathMinX);
+            const startX = Math.floor(mathMinX / xStep) * xStep;
+            for (let x = startX; x <= mathMaxX; x += xStep) {
+                if (Math.abs(x) < 1e-10) continue; // Skip 0
+                const sx = toScreenX(x);
+                ctx.beginPath(); ctx.moveTo(sx, originY - 3); ctx.lineTo(sx, originY + 3); ctx.stroke();
+                ctx.fillText(Number(x.toPrecision(3)), sx, originY + 6);
+            }
+
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
+            const yStep = calculateTickSpacing(mathMaxY - mathMinY);
+            const startY = Math.floor(mathMinY / yStep) * yStep;
+            for (let y = startY; y <= mathMaxY; y += yStep) {
+                if (Math.abs(y) < 1e-10) continue; // Skip 0
+                const sy = toScreenY(y);
+                ctx.beginPath(); ctx.moveTo(originX - 3, sy); ctx.lineTo(originX + 3, sy); ctx.stroke();
+                ctx.fillText(Number(y.toPrecision(3)), originX - 6, sy);
+            }
+            
+            // Origin Label
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'top';
+            ctx.fillText('0', originX - 4, originY + 4);
+        }
+
+        function drawFunctionCurve() {
+            ctx.beginPath();
+            ctx.strokeStyle = '#0f172a'; // Slate 900
+            ctx.lineWidth = 2.5;
+
+            const steps = 500;
+            let isDrawing = false;
+
+            if (axis === 'x') {
+                const dx = (mathMaxX - mathMinX) / steps;
+                for (let i = 0; i <= steps; i++) {
+                    const x = mathMinX + i * dx;
+                    const y = evaluateMath(x);
+                    if (y !== null && isFinite(y)) {
+                        const sx = toScreenX(x);
+                        const sy = toScreenY(y);
+                        if (!isDrawing) { ctx.moveTo(sx, sy); isDrawing = true; }
+                        else { ctx.lineTo(sx, sy); }
+                    } else { isDrawing = false; }
+                }
+            } else {
+                const dy = (mathMaxY - mathMinY) / steps;
+                for (let i = 0; i <= steps; i++) {
+                    const y = mathMinY + i * dy;
+                    const x = evaluateMath(y);
+                    if (x !== null && isFinite(x)) {
+                        const sx = toScreenX(x);
+                        const sy = toScreenY(y);
+                        if (!isDrawing) { ctx.moveTo(sx, sy); isDrawing = true; }
+                        else { ctx.lineTo(sx, sy); }
+                    } else { isDrawing = false; }
+                }
+            }
+            ctx.stroke();
+        }
+
+        function drawExactArea(a, b) {
+            const start = Math.min(a, b);
+            const end = Math.max(a, b);
+            
+            const steps = 400;
+            const dVal = (end - start) / steps;
+
+            for (let i = 0; i < steps; i++) {
+                const val1 = start + i * dVal;
+                const val2 = start + (i + 1) * dVal;
+                const out1 = evaluateMath(val1);
+                const out2 = evaluateMath(val2);
+
+                if (out1 === null || out2 === null || !isFinite(out1) || !isFinite(out2)) continue;
+
+                const outMid = (out1 + out2) / 2;
+                
+                ctx.beginPath();
+                if (axis === 'x') {
+                    ctx.moveTo(toScreenX(val1), toScreenY(0));
+                    ctx.lineTo(toScreenX(val1), toScreenY(out1));
+                    ctx.lineTo(toScreenX(val2), toScreenY(out2));
+                    ctx.lineTo(toScreenX(val2), toScreenY(0));
+                } else {
+                    ctx.moveTo(toScreenX(0), toScreenY(val1));
+                    ctx.lineTo(toScreenX(out1), toScreenY(val1));
+                    ctx.lineTo(toScreenX(out2), toScreenY(val2));
+                    ctx.lineTo(toScreenX(0), toScreenY(val2));
+                }
+                ctx.closePath();
+
+                if (outMid >= 0) {
+                    ctx.fillStyle = 'rgba(59, 130, 246, 0.3)'; // blue-500
+                    ctx.strokeStyle = 'rgba(59, 130, 246, 0.5)';
+                } else {
+                    ctx.fillStyle = 'rgba(239, 68, 68, 0.3)'; // red-500
+                    ctx.strokeStyle = 'rgba(239, 68, 68, 0.5)';
+                }
+                ctx.fill();
+                ctx.stroke();
+            }
+            
+            drawBoundLine(start);
+            drawBoundLine(end);
+        }
+
+        function drawRiemannSums(a, b) {
+            const n = parseInt(nSlider.value);
+            const start = Math.min(a, b);
+            const end = Math.max(a, b);
+            const dVal = (end - start) / n;
+
+            for (let i = 0; i < n; i++) {
+                const valLeft = start + i * dVal;
+                const valRight = valLeft + dVal;
+                
+                let evalVal;
+                if (riemannType === 'left') evalVal = valLeft;
+                else if (riemannType === 'right') evalVal = valRight;
+                else evalVal = valLeft + dVal/2;
+
+                const rectOut = evaluateMath(evalVal);
+                if (rectOut === null || !isFinite(rectOut)) continue;
+
+                let sx, sy, sWidth, sHeight, pointX, pointY;
+
+                if (axis === 'x') {
+                    sx = toScreenX(valLeft);
+                    sy = toScreenY(rectOut);
+                    sWidth = toScreenX(valRight) - toScreenX(valLeft);
+                    sHeight = toScreenY(0) - toScreenY(rectOut);
+                    pointX = toScreenX(evalVal);
+                    pointY = sy;
+                } else {
+                    sx = toScreenX(0);
+                    sy = toScreenY(valRight); // top edge in screen coords is valRight
+                    sWidth = toScreenX(rectOut) - toScreenX(0);
+                    sHeight = toScreenY(valLeft) - toScreenY(valRight); // bottom edge minus top edge
+                    pointX = toScreenX(rectOut);
+                    pointY = toScreenY(evalVal);
+                }
+
+                if (rectOut >= 0) {
+                    ctx.fillStyle = 'rgba(59, 130, 246, 0.4)';
+                    ctx.strokeStyle = 'rgba(29, 78, 216, 0.8)';
+                } else {
+                    ctx.fillStyle = 'rgba(239, 68, 68, 0.4)';
+                    ctx.strokeStyle = 'rgba(185, 28, 28, 0.8)';
+                }
+
+                ctx.fillRect(sx, sy, sWidth, sHeight);
+                ctx.strokeRect(sx, sy, sWidth, sHeight);
+                
+                // Draw evaluation point indicator
+                ctx.beginPath();
+                ctx.arc(pointX, pointY, 3, 0, 2*Math.PI);
+                ctx.fillStyle = '#1e293b';
+                ctx.fill();
+            }
+
+            drawBoundLine(start);
+            drawBoundLine(end);
+        }
+
+        function drawBoundLine(mathVal) {
+            ctx.beginPath();
+            ctx.setLineDash([5, 5]);
+            ctx.strokeStyle = '#cbd5e1';
+            ctx.lineWidth = 1.5;
+            
+            if (axis === 'x') {
+                const sx = toScreenX(mathVal);
+                ctx.moveTo(sx, 0);
+                ctx.lineTo(sx, canvas.height / (window.devicePixelRatio || 1));
+            } else {
+                const sy = toScreenY(mathVal);
+                ctx.moveTo(0, sy);
+                ctx.lineTo(canvas.width / (window.devicePixelRatio || 1), sy);
+            }
+            
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        // --- Numerical Integration ---
+        // Using Simpson's 1/3 rule for highly accurate numerical integration
+        function calculateMetrics(a, b) {
+            if (mode === 'exact') {
+                // Exact Area calculations
+                const n = 1000; // Even number for Simpson's rule
+                const dVal = (b - a) / n;
+                
+                let integralSum = 0;
+                let absoluteAreaSum = 0;
+
+                for (let i = 0; i <= n; i++) {
+                    const val = a + i * dVal;
+                    const out = evaluateMath(val) || 0;
+                    
+                    let weight = (i === 0 || i === n) ? 1 : (i % 2 === 1 ? 4 : 2);
+                    
+                    integralSum += weight * out;
+                    absoluteAreaSum += weight * Math.abs(out);
+                }
+                
+                let integral = (dVal / 3) * integralSum;
+                let area = Math.abs((dVal / 3) * absoluteAreaSum); // Absolute area is always positive
+
+                resIntegral.innerText = integral.toFixed(4);
+                resArea.innerText = area.toFixed(4);
+                
+            } else {
+                // Riemann Sum Calculation
+                const n = parseInt(nSlider.value);
+                const dVal = (b - a) / n;
+                let sum = 0;
+                let absSum = 0;
+
+                for (let i = 0; i < n; i++) {
+                    let evalVal;
+                    if (riemannType === 'left') evalVal = a + i * dVal;
+                    else if (riemannType === 'right') evalVal = a + (i + 1) * dVal;
+                    else evalVal = a + (i + 0.5) * dVal;
+
+                    const out = evaluateMath(evalVal) || 0;
+                    sum += out * dVal;
+                    absSum += Math.abs(out * dVal);
+                }
+
+                resIntegral.innerText = sum.toFixed(4) + " (approx)";
+                resArea.innerText = Math.abs(absSum).toFixed(4) + " (approx)";
+            }
+        }
+
+        // Initialize application
+        window.onload = init;
+
+    </script>
+</body>
+</html>
